@@ -1,0 +1,30 @@
+---
+- name: Database Deployment
+  hosts: all
+  become: true
+  tasks:
+    - name: Change redis bind ip
+      lineinfile: 
+        path: /etc/redis/redis.conf
+        regexp: 'bind 127.0.0.1 ::1'
+        line: 'bind 0.0.0.0'
+        backrefs: yes
+
+    - name: Kill 6379 port
+      shell: sudo kill -9 $(sudo lsof -t -i:6379)
+      args:
+         chdir: /home/ubuntu
+      when: port_check.failed == false
+
+    - name: Change redis protected mode
+      lineinfile: 
+        path: /etc/redis/redis.conf
+        regexp: 'protected-mode yes'
+        line: 'protected-mode no'
+        backrefs: yes
+        
+    - name: Stop redis 
+      shell: sudo /etc/init.d/redis-server stop
+
+    - name: Start redis 
+      shell: redis-server --protected-mode no

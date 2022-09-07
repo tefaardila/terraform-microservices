@@ -1,0 +1,123 @@
+---
+- name: backend Setup
+  hosts: localhost
+  become: true
+  tasks:
+
+    - name: Install git
+      apt: name=git state=present 
+
+    - name: Check if repository exists
+      stat:
+        path: "/home/ubuntu/microservice-app-example"
+      register: result
+      
+    - name: install repository
+      git: 
+        repo: https://github.com/tefaardila/microservice-app-example.git
+        dest: /home/ubuntu/microservice-app-example
+        clone: yes
+      when: not result.stat.exists
+
+
+    - name: Remove other folders
+      file:
+        path: "{{ item }}"
+        state: absent
+      with_items:
+        - /home/ubuntu/microservice-app-example/frontend/
+
+    - name: Install Java jdk 8 
+      apt: name=openjdk-8-jdk state=present
+    
+    - name: Install maven
+      apt: name=maven state=present
+
+
+    - name: Install Go with Snap
+      shell: sudo snap install --classic --channel=1.18/stable go
+
+    - name: Check if Node exists
+      stat:
+        path: "/usr/bin/node"
+      register: result2
+
+    - name: Add nodejs apt key
+      apt_key:
+        url: https://deb.nodesource.com/gpgkey/nodesource.gpg.key
+        state: present
+      when: not result2.stat.exists
+    
+    - name: Get nodejs
+      shell: sudo curl -sL https://deb.nodesource.com/setup_8.x | sudo -E bash -
+      when: not result2.stat.exists
+
+    - name: Install nodejs 
+      apt: 
+        name: nodejs
+        state: present 
+
+    - name: Repository Python
+      apt_repository:
+        repo: ppa:deadsnakes/ppa
+        state: present
+        update_cache: yes
+      
+    - name: Install python3.6
+      apt: name=python state=present
+
+    - name: Install Pip3
+      apt: name=python3-pip state=present
+
+    - name: install Zipkin
+      shell: curl -sSL https://zipkin.io/quickstart.sh | bash -s
+      
+    - name: Setup users-api
+      shell: ./mvnw clean install -X
+      args:
+        chdir: /home/ubuntu/microservice-app-example/users-api/
+      ignore_errors: yes
+    
+    - name: export go Variable in Auth-api 
+      shell: sudo echo 'export GO111MODULE=on' >> /$HOME/.profile
+      args:
+        chdir: /home/ubuntu/microservice-app-example/auth-api
+
+    - name: Check if Go mod exists
+      stat:
+        path: "/home/ubuntu/microservice-app-example/auth-api/go.mod"
+      register: result3
+      
+
+    - name: Go init in Auth-api 
+      shell: sudo echo 'export GO111MODULE=on' >> /$HOME/.profile
+      shell: sudo go mod init github.com/tefaardila/microservice-app-example/tree/master/auth-api
+      args:
+        chdir: /home/ubuntu/microservice-app-example/auth-api
+      when: not result3.stat.exists
+
+    - name: Go mod Auth-api
+      shell: sudo go mod tidy
+      args:
+        chdir: /home/ubuntu/microservice-app-example/auth-api
+
+    - name: Go build  Auth-api
+      shell: sudo go build
+      args:
+        chdir: /home/ubuntu/microservice-app-example/auth-api
+
+    - name: Install pm2
+      shell: sudo npm install pm2 -g
+      args:
+        chdir: /home/ubuntu
+
+    - name: Setpup todos-api
+      shell: sudo npm install
+      args:
+        chdir: /home/ubuntu/microservice-app-example/todos-api/
+
+    - name: Setpup log mesasage processor
+      shell: sudo pip3 install redis
+      shell: sudo pip3 install -r requirements.txt
+      args:
+        chdir: /home/ubuntu/microservice-app-example/log-message-processor/

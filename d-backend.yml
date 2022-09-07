@@ -1,0 +1,64 @@
+---
+- name: backend Deployment
+  hosts: localhost
+  become: true
+  tasks:   
+
+    - name: Kill all ports
+      shell: sudo kill -9 $(sudo lsof -t -i:8000)
+      shell: sudo kill -9 $(sudo lsof -t -i:8082)
+      shell: sudo kill -9 $(sudo lsof -t -i:8083)
+      args:
+        chdir: /home/ubuntu
+      ignore_errors: yes
+      #  when: port_check.failed == false
+       
+
+    - name: Deploy users api
+      shell: screen -dm bash -c "JWT_SECRET=PRFT SERVER_PORT=8083 java -jar target/users-api-0.0.1-SNAPSHOT.jar"
+      args:
+         chdir: /home/ubuntu/microservice-app-example/users-api   
+
+    - name: Deploy authentication api
+      shell:  screen -dm bash -c "JWT_SECRET=PRFT AUTH_API_PORT=8000 USERS_API_ADDRESS=http://{{ backip }}:8083 ./auth-api"
+      args:
+         chdir: /home/ubuntu/microservice-app-example/auth-api 
+    
+    - name: deploy log message processor
+      shell: screen -dm bash -c "REDIS_HOST={{ databaseip }} REDIS_PORT=6379 REDIS_CHANNEL=log_channel python3 main.py"
+      args:
+         chdir: /home/ubuntu/microservice-app-example/log-message-processor    
+    
+    - name: Check zipkin in localhost
+      delegate_to: localhost
+      stat:
+        path: "C:/Users/sthefania.ardilab/training/SCM2/microservices-ansible/zipkin.jar"
+      register: result
+
+    - name: Run Zipkin
+      shell: java -jar zipkin.jar &
+      when: not result.stat.exists
+
+
+    # - name: Check if port 8082 is listening
+    #   wait_for:
+    #     port: 8082
+    #     delay: 5
+    #     timeout: 10
+    #     msg: "Timeout waiting for 8082 to respond"
+    #   register: port_check
+    #   ignore_errors: yes
+      
+
+    - name: Kill pm2 todos process
+      shell: sudo pm2 kill
+      args:
+         chdir: /home/ubuntu
+      ignore_errors: yes
+
+    
+
+    - name: deploy todos
+      shell: export TODO_API_PORT=8082 REDIS_HOST={{ databaseip }} REDIS_PORT=6379; sudo pm2 start "JWT_SECRET=PRFT TODO_API_PORT=8082 REDIS_HOST={{ databaseip }} REDIS_PORT=6379 npm run start"
+      args:
+         chdir: /home/ubuntu/microservice-app-example/todos-api

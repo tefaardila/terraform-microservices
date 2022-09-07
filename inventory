@@ -1,0 +1,2 @@
+[proxy]
+$(aws_instance.tf-public1.public_ip)

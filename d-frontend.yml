@@ -1,0 +1,13 @@
+---
+- name: Frontend Deployment
+  hosts: localhost
+  become: true
+  tasks:    
+    - name: deploy frontend
+      shell: export AUTH_API_ADDRESS=http://{{ backip }}:8000 TODOS_API_ADDRESS=http://{{ backip }}:8082; source ~/.bashrc; screen -dm bash -c "PORT=8080 npm start"
+      args:
+         chdir: /home/ubuntu/microservice-app-example/frontend
+
+    - name: Run Zipkin
+      shell: java -jar zipkin.jar &
+      

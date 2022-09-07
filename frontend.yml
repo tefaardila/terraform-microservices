@@ -1,0 +1,66 @@
+---
+- name: Frontend setup
+  hosts: localhost
+  become: true
+  tasks:
+
+    - name: Install git
+      apt: name=git state=present 
+
+    - name: Check if repository exists
+      stat:
+        path: "/home/ubuntu/microservice-app-example"
+      register: result
+      
+    - name: install repository
+      git: 
+        repo: https://github.com/tefaardila/microservice-app-example.git
+        dest: /home/ubuntu/microservice-app-example
+        clone: yes
+      when: not result.stat.exists
+
+    - name: Remove other folders
+      file:
+        path: "{{ item }}"
+        state: absent
+      with_items:
+        - /home/ubuntu/microservice-app-example/todos-api/
+        - /home/ubuntu/microservice-app-example/log-message-processor/
+        - /home/ubuntu/microservice-app-example/auth-api/
+        - /home/ubuntu/microservice-app-example/users-api/
+
+    - name: Check if Node exists
+      stat:
+        path: "/usr/bin/node"
+      register: result2
+
+    - name: Add nodejs apt key
+      apt_key:
+        url: https://deb.nodesource.com/gpgkey/nodesource.gpg.key
+        state: present
+      when: not result2.stat.exists
+    
+    - name: Get nodejs
+      shell: sudo curl -sL https://deb.nodesource.com/setup_8.x | sudo -E bash -
+      when: not result2.stat.exists
+
+    - name: Install Java jdk 8 
+      apt: name=openjdk-8-jdk state=present
+      
+    - name: Install nodejs 
+      apt: 
+        name: nodejs
+        state: present 
+    
+    - name: install Zipkin
+      shell: curl -sSL https://zipkin.io/quickstart.sh | bash -s
+
+    - name: Setpup Frontend - Run npm install
+      shell: sudo npm install 
+      args:
+        chdir: /home/ubuntu/microservice-app-example/frontend/
+    
+    - name: Setpup Frontend - Run npm build
+      shell: sudo npm run build
+      args: 
+        chdir: /home/ubuntu/microservice-app-example/frontend/
